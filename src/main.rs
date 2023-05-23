@@ -50,13 +50,12 @@ fn main() {
             low_price: l_sum,
         };
         let stream_data = models::StreamData {
-            stream: String::from("btcusdtethusdt"),
+            stream: String::from("btcusdt+ethusd@1m"),
             data: ends_data,
         };
 
         let json = serde_json::to_string(&stream_data).unwrap();
 
         println!("{}", json);
-            }
+    }
 }
-

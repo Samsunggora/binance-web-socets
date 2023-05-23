@@ -28,3 +28,18 @@ pub struct MyNestedData {
     pub v: String,
     pub x: bool,
 }
+
+#[derive(Serialize)]
+pub struct StreamData {
+    pub stream: String,
+    pub data: EndData,
+}
+
+#[derive(Serialize)]
+pub struct EndData {
+    pub timestamp: u64,
+    pub open_price: f64,
+    pub close_price: f64,
+    pub high_price: f64,
+    pub low_price: f64,
+}

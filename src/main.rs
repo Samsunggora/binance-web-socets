@@ -1,92 +1,62 @@
 mod models;
-
-use std::thread;
 use tungstenite::connect;
 use url::Url;
 
 static BINANCE_WS_API: &str = "wss://stream.binance.com:9443";
-
+static ETH_USDT: &str = "ethusdt";
+static BTC_USDT: &str = "btcusdt";
 fn main() {
-    let handle1 = thread::spawn(|| {
-        binance_url_ethusdt();
-    });
+    let binance_url_ethusdt = format!("{}/ws/{}@kline_1m", BINANCE_WS_API, ETH_USDT);
+    let binance_url_btcusdt = format!("{}/ws/{}@kline_1m", BINANCE_WS_API, BTC_USDT);
 
-    let handle2 = thread::spawn(|| {
-        binance_url_btcusdt();
-    });
-
-    handle1.join().unwrap();
-    handle2.join().unwrap();
-}
-
-fn binance_url_ethusdt() {
-    let binance_url_ethusdt = format!("{}/ws/ethusdt@kline_1m", BINANCE_WS_API);
-    let (mut socket, response) =
+    let (mut first_socket, first_response) =
         connect(Url::parse(&binance_url_ethusdt).unwrap()).expect("Can't connect.");
 
-    println!("Connected to binance stream.");
-    println!("HTTP status code: {}", response.status());
-    println!("Response headers:");
-    for (ref header, header_value) in response.headers() {
-        println!("- {}: {:?}", header, header_value);
-    }
-    println!("______________________________________________________________________");
-
-    loop {
-        let msg = socket.read_message().expect("Error reading message");
-        let msg = match msg {
-            tungstenite::Message::Text(s) => s,
-            _ => {
-                panic!("Error getting text");
-            }
-        };
-
-        let parsed: models::MyData = serde_json::from_str(&msg).expect("Can't parse");
-        let sum = parsed.k.o.parse::<f64>().unwrap()
-            + parsed.k.c.parse::<f64>().unwrap()
-            + parsed.k.h.parse::<f64>().unwrap()
-            + parsed.k.l.parse::<f64>().unwrap();
-
-        // let data: models::MyData = serde_json::from_str(parsed_data).unwrap();
-
-        println!("{:?}", parsed);
-        println!("sum: {:?}", sum);
-        println!("______________________________________________________________________");
-    }
-}
-fn binance_url_btcusdt() {
-    let binance_url_btcusdt = format!("{}/ws/btcusdt@kline_1m", BINANCE_WS_API);
-
-    let (mut socket, response) =
+    let (mut second_socket, second_response) =
         connect(Url::parse(&binance_url_btcusdt).unwrap()).expect("Can't connect.");
 
-    println!("Connected to binance stream.");
-    println!("HTTP status code: {}", response.status());
-    println!("Response headers:");
-    for (ref header, header_value) in response.headers() {
-        println!("- {}: {:?}", header, header_value);
-    }
-    println!("______________________________________________________________________");
-
     loop {
-        let msg = socket.read_message().expect("Error reading message");
-        let msg = match msg {
+        let first_msg = first_socket.read_message().expect("Error reading message");
+        let first_msg = match first_msg {
             tungstenite::Message::Text(s) => s,
             _ => {
                 panic!("Error getting text");
             }
         };
 
-        let parsed: models::MyData = serde_json::from_str(&msg).expect("Can't parse");
-        let sum = parsed.k.o.parse::<f64>().unwrap()
-            + parsed.k.c.parse::<f64>().unwrap()
-            + parsed.k.h.parse::<f64>().unwrap()
-            + parsed.k.l.parse::<f64>().unwrap();
+        let second_msg = second_socket.read_message().expect("Error reading message");
+        let second_msg = match second_msg {
+            tungstenite::Message::Text(s) => s,
+            _ => {
+                panic!("Error getting text");
+            }
+        };
 
-        // let data: models::MyData = serde_json::from_str(parsed_data).unwrap();
+        let first_parsed: models::MyData = serde_json::from_str(&first_msg).expect("Can't parse");
+        let second_parsed: models::MyData = serde_json::from_str(&second_msg).expect("Can't parse");
+        let o_sum =
+            first_parsed.k.o.parse::<f64>().unwrap() + second_parsed.k.c.parse::<f64>().unwrap();
+        let h_sum =
+            first_parsed.k.h.parse::<f64>().unwrap() + second_parsed.k.h.parse::<f64>().unwrap();
+        let l_sum =
+            first_parsed.k.l.parse::<f64>().unwrap() + second_parsed.k.l.parse::<f64>().unwrap();
+        let c_sum =
+            first_parsed.k.c.parse::<f64>().unwrap() + second_parsed.k.c.parse::<f64>().unwrap();
+        let ends_data = models::EndData {
+            timestamp: first_parsed.k.t,
+            open_price: o_sum,
+            close_price: c_sum,
+            high_price: h_sum,
+            low_price: l_sum,
+        };
+        let stream_data = models::StreamData {
+            stream: String::from("btcusdtethusdt"),
+            data: ends_data,
+        };
 
-        println!("{:?}", parsed);
-        println!("sum: {:?}", sum);
-        println!("______________________________________________________________________");
-    }
+        let json = serde_json::to_string(&stream_data).unwrap();
+
+        println!("{}", json);
+            }
 }
+
